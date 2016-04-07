@@ -7,6 +7,11 @@
  * http://amzn.to/1LGWsLG
  */
 
+TrackTypes = {};
+TrackTypes['MONO'] = '2';
+TrackTypes['STEREO'] = '3';
+TrackTypes['QUAD'] = '4';
+
 // Route the incoming request based on type (LaunchRequest, IntentRequest,
 // etc.) The JSON body of the request is provided in the event parameter.
 exports.handler = function (event, context) {
@@ -78,8 +83,22 @@ function onIntent(intentRequest, session, callback) {
         intentName = intentRequest.intent.name;
 
     // Dispatch to your skill's intent handlers
+	
+	//TODO: Fix this if statement explosion
     if ("MyColorIsIntent" === intentName) {
-        setColorInSession(intent, session, callback);
+        setTrackIdSession(intent, session, callback, '0', 'Adding three tracks to Pro Tools session');
+    } else if ("CreateProToolsTrackIntent" === intentName) {
+        setTrackIdSession(intent, session, callback, '1', 'Starting to add tracks to Pro Tools session');
+    } else if ("AddProToolsMonoTrackIntent" === intentName) {
+        setTrackIdSession(intent, session, callback, TrackTypes['MONO'], 'Adding Mono track to Pro Tools session');
+    } else if ("AddProToolsStereoTrackIntent" === intentName) {
+        setTrackIdSession(intent, session, callback, TrackTypes['STEREO'], 'Adding Stereo track to Pro Tools session');
+    } else if ("AddProToolsQuadTrackIntent" === intentName) {
+        setTrackIdSession(intent, session, callback, TrackTypes['QUAD'], 'Adding Quad track to Pro Tools session');
+    } else if ("HitEnterOnProToolsIntent" === intentName) {
+        setTrackIdSession(intent, session, callback, '5', 'Ending track adding to Pro Tools session');
+    } else if ("SaveSessionProToolsIntent" === intentName) {
+        setTrackIdSession(intent, session, callback, '6', 'Saving Pro Tools session');
     } else if ("WhatsMyColorIntent" === intentName) {
         getColorFromSession(intent, session, callback);
     } else if ("AMAZON.HelpIntent" === intentName) {
@@ -119,28 +138,32 @@ function getWelcomeResponse(callback) {
 /**
  * _______ in the session and prepares the speech to reply to the user.
  */
-function setColorInSession(intent, session, callback) {
+function setTrackIdSession(intent, session, callback, macro, speech) {
     var cardTitle = intent.name;
     var repromptText = "";
     var sessionAttributes = {};
     var shouldEndSession = false;
-    var speechOutput = "Add new track";
-    var AWS = require('aws-sdk');
+    var speechOutput = speech;
+   
+    saveToS3(macro);
+    
+    callback(sessionAttributes,
+        buildSpeechletResponse(cardTitle, speechOutput, repromptText, shouldEndSession));
+}
 
-var params = {Bucket: 'mixstudiocommands', Key: 'commands', Body : '15'};
-var s3 = new AWS.S3();
-s3.upload(params,
-function(err, data) {
- if(err) {
-     console.log(err, "Some error happened");
-     context.fail("Something bad happened");
- }
- console.log("Successfully uploaded data to myBucket/myKey");
- callback(sessionAttributes,
-     buildSpeechletResponse(cardTitle, speechOutput, repromptText, shouldEndSession));
-});
+function saveToS3(macro){
+     var AWS = require('aws-sdk');
 
-
+    var params = {Bucket: 'mixstudiocommands', Key: 'commands', Body : macro};
+    var s3 = new AWS.S3();
+    s3.upload(params,
+    function(err, data) {
+        if(err) {
+            console.log(err, "Some error happened");
+            context.fail("Something bad happened");
+        }
+        console.log("Successfully uploaded data to myBucket/myKey");
+    });
 }
 
 function createFavoriteColorAttributes(favoriteColor) {
